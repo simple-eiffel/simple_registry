@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>simple_registry - Windows Registry Access for Eiffel</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="icon" type="image/png" href="images/logo.png">
+</head>
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="images/logo.png" alt="simple_* logo" class="logo">
+        </div>
+        <h1>simple_registry</h1>
+        <p class="tagline">Windows Registry Access for Eiffel</p>
+        <div class="badges">
+            <span class="badge badge-rfc">Foundation Layer</span>
+            <span class="badge badge-version">v1.0.0</span>
+            <span class="badge badge-license">MIT</span>
+        </div>
+    </header>
+
+    <nav>
+        <ul>
+            <li><a href="#overview">Overview</a></li>
+            <li><a href="#quick-start">Quick Start</a></li>
+            <li><a href="#features">Features</a></li>
+            <li><a href="#api">API Reference</a></li>
+            <li><a href="https://github.com/ljr1981/simple_registry">GitHub</a></li>
+        </ul>
+    </nav>
+
+    <main>
+        <section id="overview">
+            <h2>Overview</h2>
+            <p>
+                <strong>simple_registry</strong> provides safe, SCOOP-compatible access to the Windows Registry
+                from Eiffel applications. It wraps the Win32 Registry API functions through a clean C interface,
+                enabling registry operations without threading complications.
+            </p>
+            <p>
+                The library supports reading and writing string, integer, and binary values across all major
+                registry hives (HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, etc.), with proper error handling
+                and resource cleanup.
+            </p>
+            <p>
+                Part of the <strong>simple_*</strong> ecosystem of focused, single-purpose Eiffel libraries.
+            </p>
+        </section>
+
+        <section id="quick-start">
+            <h2>Quick Start</h2>
+            <h3>Installation</h3>
+            <pre><code>&lt;library name="simple_registry" location="$SIMPLE_REGISTRY\simple_registry.ecf"/&gt;</code></pre>
+
+            <h3>Read a String Value</h3>
+            <pre><code>local
+    reg: SIMPLE_REGISTRY
+    value: detachable STRING_8
+do
+    create reg.make
+
+    -- Read from HKEY_CURRENT_USER
+    value := reg.read_string (reg.HKCU, "Software\MyApp", "Username")
+
+    if attached value as v then
+        print ("Username: " + v)
+    end
+
+    reg.close
+end</code></pre>
+
+            <h3>Write Values</h3>
+            <pre><code>local
+    reg: SIMPLE_REGISTRY
+do
+    create reg.make
+
+    -- Write a string value
+    reg.write_string (reg.HKCU, "Software\MyApp", "Username", "JohnDoe")
+
+    -- Write an integer value
+    reg.write_integer (reg.HKCU, "Software\MyApp", "LaunchCount", 42)
+
+    if reg.last_write_succeeded then
+        print ("Values written successfully")
+    end
+
+    reg.close
+end</code></pre>
+        </section>
+
+        <section id="features">
+            <h2>Features</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h4>Read Values</h4>
+                    <p>Query string, integer (DWORD), and binary registry values</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Write Values</h4>
+                    <p>Create or update string and integer values</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Delete Values</h4>
+                    <p>Remove specific values from registry keys</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Key Management</h4>
+                    <p>Open, create, and delete registry keys</p>
+                </div>
+            </div>
+
+            <h3>Registry Hives</h3>
+            <table>
+                <tr><th>Constant</th><th>Hive</th></tr>
+                <tr><td><code>HKCU</code></td><td>HKEY_CURRENT_USER</td></tr>
+                <tr><td><code>HKLM</code></td><td>HKEY_LOCAL_MACHINE</td></tr>
+                <tr><td><code>HKCR</code></td><td>HKEY_CLASSES_ROOT</td></tr>
+                <tr><td><code>HKU</code></td><td>HKEY_USERS</td></tr>
+                <tr><td><code>HKCC</code></td><td>HKEY_CURRENT_CONFIG</td></tr>
+            </table>
+        </section>
+
+        <section id="api">
+            <h2>API Reference</h2>
+
+            <div class="api-section">
+                <h3>read_string (a_hive, a_subkey, a_value_name): detachable STRING_8</h3>
+                <div class="signature">value := reg.read_string (reg.HKCU, "Software\MyApp", "Setting")</div>
+                <p>Read REG_SZ value from registry. Returns Void if not found.</p>
+            </div>
+
+            <div class="api-section">
+                <h3>read_integer (a_hive, a_subkey, a_value_name): INTEGER</h3>
+                <div class="signature">count := reg.read_integer (reg.HKCU, "Software\MyApp", "Count")</div>
+                <p>Read REG_DWORD value from registry.</p>
+            </div>
+
+            <div class="api-section">
+                <h3>write_string (a_hive, a_subkey, a_value_name, a_value)</h3>
+                <div class="signature">reg.write_string (reg.HKCU, "Software\MyApp", "Name", "Value")</div>
+                <p>Write REG_SZ value to registry.</p>
+            </div>
+
+            <div class="api-section">
+                <h3>write_integer (a_hive, a_subkey, a_value_name, a_value)</h3>
+                <div class="signature">reg.write_integer (reg.HKCU, "Software\MyApp", "Count", 42)</div>
+                <p>Write REG_DWORD value to registry.</p>
+            </div>
+
+            <h3>Status Queries</h3>
+            <table>
+                <tr><th>Feature</th><th>Description</th></tr>
+                <tr><td><code>last_read_succeeded</code></td><td>Did the last read operation succeed?</td></tr>
+                <tr><td><code>last_write_succeeded</code></td><td>Did the last write operation succeed?</td></tr>
+                <tr><td><code>last_error_code</code></td><td>Windows error code from last failed operation</td></tr>
+            </table>
+        </section>
+    </main>
+
+    <footer>
+        <p>Part of the <a href="https://github.com/ljr1981">simple_*</a> library collection</p>
+        <p>Dependencies: base, encoding</p>
+        <p class="copyright">MIT License - Copyright (c) 2024-2025, Larry Rix</p>
+    </footer>
+</body>
+</html>
