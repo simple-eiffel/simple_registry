@@ -1,79 +1,207 @@
 /*
- * simple_registry.h - Windows Registry access for Eiffel
- * Copyright (c) 2025 Larry Rix - MIT License
+ * simple_registry.h - Windows Registry helper functions for Eiffel
+ * 
+ * This header provides a C interface to Windows Registry operations,
+ * designed to be called from Eiffel via inline C externals.
+ * 
+ * Following Eric Bezault's recommended pattern: struct definitions
+ * and helper functions in .h file, called from Eiffel inline C.
  */
 
 #ifndef SIMPLE_REGISTRY_H
 #define SIMPLE_REGISTRY_H
 
 #include <windows.h>
-
-/* Predefined key constants */
-#define SR_HKEY_CLASSES_ROOT     ((HKEY)(ULONG_PTR)0x80000000)
-#define SR_HKEY_CURRENT_USER     ((HKEY)(ULONG_PTR)0x80000001)
-#define SR_HKEY_LOCAL_MACHINE    ((HKEY)(ULONG_PTR)0x80000002)
-#define SR_HKEY_USERS            ((HKEY)(ULONG_PTR)0x80000003)
-#define SR_HKEY_CURRENT_CONFIG   ((HKEY)(ULONG_PTR)0x80000005)
-
-/* Value type constants */
-#define SR_REG_SZ        1
-#define SR_REG_EXPAND_SZ 2
-#define SR_REG_BINARY    3
-#define SR_REG_DWORD     4
-#define SR_REG_MULTI_SZ  7
+#include <stdlib.h>
+#include <string.h>
 
 /* Result structure for registry operations */
 typedef struct {
-    int success;
-    int error_code;
-    int value_type;
-    char* string_value;      /* For REG_SZ, REG_EXPAND_SZ */
-    unsigned long dword_value;  /* For REG_DWORD */
-    unsigned char* binary_value; /* For REG_BINARY */
-    int binary_length;
-    char* error_message;
+    int success;           /* Non-zero if operation succeeded */
+    char* string_value;    /* String result (caller must free via sr_free_result) */
+    DWORD dword_value;     /* DWORD result */
+    char* error_message;   /* Error message if failed (caller must free) */
 } sr_result;
 
-/* Open a registry key. Returns handle or NULL on failure. */
-HKEY sr_open_key(HKEY root, const char* subkey, int write_access);
+/* Allocate and initialize a result structure */
+static sr_result* sr_create_result(void) {
+    sr_result* r = (sr_result*)malloc(sizeof(sr_result));
+    if (r) {
+        r->success = 0;
+        r->string_value = NULL;
+        r->dword_value = 0;
+        r->error_message = NULL;
+    }
+    return r;
+}
 
-/* Close a registry key. */
-void sr_close_key(HKEY key);
+/* Set error message in result */
+static void sr_set_error(sr_result* r, LONG error_code) {
+    char buf[256];
+    FormatMessageA(
+        FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+        NULL, error_code, 0, buf, sizeof(buf), NULL
+    );
+    r->error_message = _strdup(buf);
+}
 
-/* Read a string value. Caller must free result. */
-sr_result* sr_read_string(HKEY root, const char* subkey, const char* value_name);
+/* Free a result structure and its contents */
+static void sr_free_result(sr_result* r) {
+    if (r) {
+        if (r->string_value) free(r->string_value);
+        if (r->error_message) free(r->error_message);
+        free(r);
+    }
+}
 
-/* Read a DWORD value. */
-sr_result* sr_read_dword(HKEY root, const char* subkey, const char* value_name);
+/* Read a string value from registry */
+static sr_result* sr_read_string(HKEY root, const char* subkey, const char* name) {
+    sr_result* r = sr_create_result();
+    if (!r) return NULL;
+    
+    HKEY hKey;
+    LONG result = RegOpenKeyExA(root, subkey, 0, KEY_READ, &hKey);
+    if (result != ERROR_SUCCESS) {
+        sr_set_error(r, result);
+        return r;
+    }
+    
+    DWORD type, size = 0;
+    result = RegQueryValueExA(hKey, name, NULL, &type, NULL, &size);
+    if (result != ERROR_SUCCESS) {
+        RegCloseKey(hKey);
+        sr_set_error(r, result);
+        return r;
+    }
+    
+    if (type != REG_SZ && type != REG_EXPAND_SZ) {
+        RegCloseKey(hKey);
+        r->error_message = _strdup("Value is not a string type");
+        return r;
+    }
+    
+    r->string_value = (char*)malloc(size + 1);
+    if (!r->string_value) {
+        RegCloseKey(hKey);
+        r->error_message = _strdup("Memory allocation failed");
+        return r;
+    }
+    
+    result = RegQueryValueExA(hKey, name, NULL, NULL, (LPBYTE)r->string_value, &size);
+    RegCloseKey(hKey);
+    
+    if (result == ERROR_SUCCESS) {
+        r->string_value[size] = '\0';
+        r->success = 1;
+    } else {
+        free(r->string_value);
+        r->string_value = NULL;
+        sr_set_error(r, result);
+    }
+    
+    return r;
+}
 
-/* Read any value (auto-detect type). Caller must free result. */
-sr_result* sr_read_value(HKEY root, const char* subkey, const char* value_name);
+/* Read a DWORD value from registry */
+static sr_result* sr_read_dword(HKEY root, const char* subkey, const char* name) {
+    sr_result* r = sr_create_result();
+    if (!r) return NULL;
+    
+    HKEY hKey;
+    LONG result = RegOpenKeyExA(root, subkey, 0, KEY_READ, &hKey);
+    if (result != ERROR_SUCCESS) {
+        sr_set_error(r, result);
+        return r;
+    }
+    
+    DWORD type, size = sizeof(DWORD);
+    result = RegQueryValueExA(hKey, name, NULL, &type, (LPBYTE)&r->dword_value, &size);
+    RegCloseKey(hKey);
+    
+    if (result == ERROR_SUCCESS && type == REG_DWORD) {
+        r->success = 1;
+    } else if (result == ERROR_SUCCESS) {
+        r->error_message = _strdup("Value is not a DWORD type");
+    } else {
+        sr_set_error(r, result);
+    }
+    
+    return r;
+}
 
-/* Write a string value. */
-int sr_write_string(HKEY root, const char* subkey, const char* value_name, const char* data);
+/* Write a string value to registry */
+static int sr_write_string(HKEY root, const char* subkey, const char* name, const char* value) {
+    HKEY hKey;
+    LONG result = RegCreateKeyExA(root, subkey, 0, NULL, 0, KEY_WRITE, NULL, &hKey, NULL);
+    if (result != ERROR_SUCCESS) return 0;
+    
+    result = RegSetValueExA(hKey, name, 0, REG_SZ, (const BYTE*)value, (DWORD)strlen(value) + 1);
+    RegCloseKey(hKey);
+    
+    return (result == ERROR_SUCCESS) ? 1 : 0;
+}
 
-/* Write a DWORD value. */
-int sr_write_dword(HKEY root, const char* subkey, const char* value_name, unsigned long data);
+/* Write a DWORD value to registry */
+static int sr_write_dword(HKEY root, const char* subkey, const char* name, DWORD value) {
+    HKEY hKey;
+    LONG result = RegCreateKeyExA(root, subkey, 0, NULL, 0, KEY_WRITE, NULL, &hKey, NULL);
+    if (result != ERROR_SUCCESS) return 0;
+    
+    result = RegSetValueExA(hKey, name, 0, REG_DWORD, (const BYTE*)&value, sizeof(DWORD));
+    RegCloseKey(hKey);
+    
+    return (result == ERROR_SUCCESS) ? 1 : 0;
+}
 
-/* Delete a value. */
-int sr_delete_value(HKEY root, const char* subkey, const char* value_name);
+/* Delete a registry value */
+static int sr_delete_value(HKEY root, const char* subkey, const char* name) {
+    HKEY hKey;
+    LONG result = RegOpenKeyExA(root, subkey, 0, KEY_SET_VALUE, &hKey);
+    if (result != ERROR_SUCCESS) return 0;
+    
+    result = RegDeleteValueA(hKey, name);
+    RegCloseKey(hKey);
+    
+    return (result == ERROR_SUCCESS) ? 1 : 0;
+}
 
-/* Delete a key (must be empty). */
-int sr_delete_key(HKEY root, const char* subkey);
+/* Delete a registry key (must be empty) */
+static int sr_delete_key(HKEY root, const char* subkey) {
+    return (RegDeleteKeyA(root, subkey) == ERROR_SUCCESS) ? 1 : 0;
+}
 
-/* Check if a key exists. */
-int sr_key_exists(HKEY root, const char* subkey);
+/* Check if a registry key exists */
+static int sr_key_exists(HKEY root, const char* subkey) {
+    HKEY hKey;
+    LONG result = RegOpenKeyExA(root, subkey, 0, KEY_READ, &hKey);
+    if (result == ERROR_SUCCESS) {
+        RegCloseKey(hKey);
+        return 1;
+    }
+    return 0;
+}
 
-/* Check if a value exists. */
-int sr_value_exists(HKEY root, const char* subkey, const char* value_name);
+/* Check if a registry value exists */
+static int sr_value_exists(HKEY root, const char* subkey, const char* name) {
+    HKEY hKey;
+    LONG result = RegOpenKeyExA(root, subkey, 0, KEY_READ, &hKey);
+    if (result != ERROR_SUCCESS) return 0;
+    
+    result = RegQueryValueExA(hKey, name, NULL, NULL, NULL, NULL);
+    RegCloseKey(hKey);
+    
+    return (result == ERROR_SUCCESS) ? 1 : 0;
+}
 
-/* Create a key. */
-int sr_create_key(HKEY root, const char* subkey);
-
-/* Free result structure. */
-void sr_free_result(sr_result* result);
-
-/* Get last error message. */
-const char* sr_get_last_error(void);
+/* Create a registry key */
+static int sr_create_key(HKEY root, const char* subkey) {
+    HKEY hKey;
+    LONG result = RegCreateKeyExA(root, subkey, 0, NULL, 0, KEY_WRITE, NULL, &hKey, NULL);
+    if (result == ERROR_SUCCESS) {
+        RegCloseKey(hKey);
+        return 1;
+    }
+    return 0;
+}
 
 #endif /* SIMPLE_REGISTRY_H */
