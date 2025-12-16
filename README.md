@@ -72,14 +72,14 @@ cd simple_registry/Clib
 compile.bat
 ```
 
-3. Set the environment variable:
+3. Set the ecosystem environment variable (one-time setup for all simple_* libraries):
 ```bash
-set SIMPLE_REGISTRY=D:\path\to\simple_registry
+set SIMPLE_EIFFEL=D:\prod
 ```
 
 4. Add to your ECF file:
 ```xml
-<library name="simple_registry" location="$SIMPLE_REGISTRY\simple_registry.ecf"/>
+<library name="simple_registry" location="$SIMPLE_EIFFEL/simple_registry/simple_registry.ecf"/>
 ```
 
 ### Basic Usage
