@@ -15,6 +15,8 @@
 [![Design by Contract](https://img.shields.io/badge/DbC-enforced-orange.svg)]()
 [![Tests](https://img.shields.io/badge/tests-9%20passing-brightgreen.svg)]()
 
+> **Windows only.** This library wraps the Windows registry API. There is no macOS or Linux version, and none is planned.
+
 ---
 
 ## Overview
