@@ -10,10 +10,11 @@
 
 [![Language](https://img.shields.io/badge/language-Eiffel-blue.svg)](https://www.eiffel.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows-blue.svg)]()
+
 [![SCOOP](https://img.shields.io/badge/SCOOP-compatible-orange.svg)]()
 [![Design by Contract](https://img.shields.io/badge/DbC-enforced-orange.svg)]()
 [![Tests](https://img.shields.io/badge/tests-9%20passing-brightgreen.svg)]()
+![Windows only](https://img.shields.io/badge/platform-Windows%20only-0078D6?logo=windows&logoColor=white)
 
 > **Windows only.** This library wraps the Windows registry API. There is no macOS or Linux version, and none is planned.
 
